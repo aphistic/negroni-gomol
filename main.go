@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/aphistic/gomol"
+	requestid "github.com/aphistic/negroni-requestid"
 	"github.com/urfave/negroni"
 )
 
@@ -17,10 +18,11 @@ type Logger struct {
 
 	LogLevel gomol.LogLevel
 
-	FieldMethod string
-	FieldPath   string
-	FieldStatus string
-	FieldTimeMs string
+	FieldMethod    string
+	FieldPath      string
+	FieldStatus    string
+	FieldTimeMs    string
+	FieldRequestID string
 }
 
 // NewLogger will create a new Logger using the current default gomol logger base
@@ -33,10 +35,11 @@ func NewLogger() *Logger {
 
 		LogLevel: gomol.LevelInfo,
 
-		FieldMethod: "method",
-		FieldPath:   "path",
-		FieldStatus: "status",
-		FieldTimeMs: "time_ms",
+		FieldMethod:    "request_method",
+		FieldPath:      "path",
+		FieldStatus:    "status",
+		FieldTimeMs:    "time_ms",
+		FieldRequestID: "request_id",
 	}
 }
 
@@ -49,11 +52,16 @@ func NewLoggerForBase(base *gomol.Base) *Logger {
 
 func (l *Logger) ServeHTTP(rw http.ResponseWriter, req *http.Request, next http.HandlerFunc) {
 	reqAttrs := gomol.NewAttrs()
-	if len(l.FieldMethod) > 0 {
+	if l.FieldMethod != "" {
 		reqAttrs.SetAttr(l.FieldMethod, req.Method)
 	}
-	if len(l.FieldPath) > 0 {
+	if l.FieldPath != "" {
 		reqAttrs.SetAttr(l.FieldPath, req.URL.Path)
+	}
+	if l.FieldRequestID != "" {
+		if reqID, err := requestid.FromContext(req.Context()); err == nil {
+			reqAttrs.SetAttr(l.FieldRequestID, reqID)
+		}
 	}
 	start := time.Now()
 	l.base.Log(l.LogLevel, reqAttrs, "Started %v %v", req.Method, req.URL.Path)
@@ -63,10 +71,10 @@ func (l *Logger) ServeHTTP(rw http.ResponseWriter, req *http.Request, next http.
 	res := rw.(negroni.ResponseWriter)
 
 	resAttrs := gomol.NewAttrsFromMap(reqAttrs.Attrs())
-	if len(l.FieldStatus) > 0 {
+	if l.FieldStatus != "" {
 		resAttrs.SetAttr(l.FieldStatus, res.Status())
 	}
-	if len(l.FieldTimeMs) > 0 {
+	if l.FieldTimeMs != "" {
 		duration := time.Since(start)
 		resAttrs.SetAttr(l.FieldTimeMs, float64(duration.Nanoseconds())/float64(1000000))
 	}
