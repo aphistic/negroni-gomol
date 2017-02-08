@@ -64,7 +64,11 @@ func (l *Logger) ServeHTTP(rw http.ResponseWriter, req *http.Request, next http.
 		}
 	}
 	start := time.Now()
-	l.base.Log(l.LogLevel, reqAttrs, "Started %v %v", req.Method, req.URL.Path)
+
+	// stash the path since http.StripPath will make it very confusing later
+	path := req.URL.Path
+
+	l.base.Log(l.LogLevel, reqAttrs, "Started %v %v", req.Method, path)
 
 	next(rw, req)
 
@@ -78,5 +82,5 @@ func (l *Logger) ServeHTTP(rw http.ResponseWriter, req *http.Request, next http.
 		duration := time.Since(start)
 		resAttrs.SetAttr(l.FieldTimeMs, float64(duration.Nanoseconds())/float64(1000000))
 	}
-	l.base.Log(l.LogLevel, resAttrs, "Completed %v %v (%v)", req.Method, req.URL.Path, res.Status())
+	l.base.Log(l.LogLevel, resAttrs, "Completed %v %v (%v)", req.Method, path, res.Status())
 }
